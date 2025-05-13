@@ -96,8 +96,9 @@ jobs:
             rm -rf Payload
           fi
           
+      # 使用老版本的upload-artifact，避免下载问题
       - name: Upload IPA
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: app-ipa
           path: build/*.ipa

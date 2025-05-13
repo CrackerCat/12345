@@ -25,6 +25,33 @@
  * 漏洞影响：
  * 可以打开只读的root所有文件，映射其中一页，标记为VM_BEHAVIOR_ZERO_WIRED_PAGES，
  * 然后mlock页面，最后vm_deallocate页面，文件中对应区域将被清零。
+ *
+ * 漏洞利用详细步骤：
+ * 1. 使用open打开目标只读文件，获取文件描述符
+ *    - 使用O_RDONLY标志确保文件以只读方式打开
+ *    - 正常情况下，此文件不应可写入
+ *
+ * 2. 使用mmap映射文件页面到内存
+ *    - 权限设置为PROT_READ（只读）
+ *    - 映射类型为MAP_FILE | MAP_SHARED，建立文件与内存的共享映射
+ *    - 这步确保了内存映射直接连接到文件内容
+ *
+ * 3. 调用vm_behavior_set设置VM_BEHAVIOR_ZERO_WIRED_PAGES标志
+ *    - 这会在内核的vm_map_entry结构上设置zero_wired_pages标志位
+ *    - 关键漏洞点：内核允许任何进程在任何映射上设置此标志
+ * 
+ * 4. 使用mlock锁定页面到物理内存（wired）
+ *    - 增加页面的wired_count，确保页面不会被换出
+ *    - 内核允许对只读页面执行mlock操作
+ *    - 这为后续触发漏洞创建必要条件
+ *
+ * 5. 调用vm_deallocate解除映射
+ *    - 触发内核中的vm_map_delete和vm_fault_unwire流程
+ *    - 由于页面被锁定且设置了VM_BEHAVIOR_ZERO_WIRED_PAGES标志
+ *    - 内核会调用pmap_zero_page，在物理内存层面清零页面
+ *    - 由于操作发生在物理内存层面，绕过了虚拟内存的保护机制
+ *
+ * 结果：目标文件的对应页面内容被清零（全0），实现了对只读文件的写入
  */
 
 #include <stdio.h>

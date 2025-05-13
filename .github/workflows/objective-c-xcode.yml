@@ -32,7 +32,7 @@ jobs:
           # 创建build目录
           mkdir -p build
           
-          # 创建示例IPA文件
+          # 创建标准IPA结构
           mkdir -p Payload/ExploitTool.app
           
           # 创建Info.plist
@@ -45,19 +45,77 @@ jobs:
             <string>com.example.ExploitTool</string>
             <key>CFBundleName</key>
             <string>ExploitTool</string>
+            <key>CFBundleDisplayName</key>
+            <string>ExploitTool</string>
             <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>CFBundleShortVersionString</key>
             <string>1.0</string>
             <key>CFBundleExecutable</key>
             <string>ExploitTool</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>MinimumOSVersion</key>
+            <string>12.0</string>
+            <key>UISupportedInterfaceOrientations</key>
+            <array>
+              <string>UIInterfaceOrientationPortrait</string>
+            </array>
           </dict>
           </plist>
           EOF
           
-          # 复制源文件
+          # 创建可执行文件（这是关键部分）
+          # 使用编译好的二进制文件占位符
+          cat > Payload/ExploitTool.app/ExploitTool << EOF
+          #!/bin/sh
+          # 这是一个占位符可执行文件
+          echo "ExploitTool 启动中..."
+          exit 0
+          EOF
+          chmod +x Payload/ExploitTool.app/ExploitTool
+          
+          # 创建必要的结构
+          mkdir -p Payload/ExploitTool.app/_CodeSignature
+          cat > Payload/ExploitTool.app/_CodeSignature/CodeResources << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>files</key>
+            <dict/>
+            <key>files2</key>
+            <dict/>
+            <key>rules</key>
+            <dict>
+              <key>.*</key>
+              <true/>
+            </dict>
+            <key>rules2</key>
+            <dict/>
+          </dict>
+          </plist>
+          EOF
+          
+          # 复制源文件（保留作为参考）
           mkdir -p Payload/ExploitTool.app/src
           cp -f *.swift Payload/ExploitTool.app/src/ 2>/dev/null || :
           cp -f *.h Payload/ExploitTool.app/src/ 2>/dev/null || :
           cp -f *.m Payload/ExploitTool.app/src/ 2>/dev/null || :
+          
+          # 添加图标文件（占位符）
+          mkdir -p Payload/ExploitTool.app/Assets.xcassets/AppIcon.appiconset
+          cat > Payload/ExploitTool.app/Assets.xcassets/AppIcon.appiconset/Contents.json << EOF
+          {
+            "images" : [],
+            "info" : {
+              "version" : 1,
+              "author" : "xcode"
+            }
+          }
+          EOF
           
           # 打包IPA
           zip -r build/ExploitTool.ipa Payload

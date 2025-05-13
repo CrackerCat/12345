@@ -1,0 +1,75 @@
+name: iOS Package Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build iOS Package
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: List workspace files
+        run: |
+          echo "工作目录内容:"
+          ls -la
+          echo "--------------------"
+      
+      - name: Create IPA package
+        run: |
+          # 创建build目录
+          mkdir -p build
+          
+          # 创建示例IPA文件
+          mkdir -p Payload/ExploitTool.app
+          
+          # 创建Info.plist
+          cat > Payload/ExploitTool.app/Info.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleIdentifier</key>
+            <string>com.example.ExploitTool</string>
+            <key>CFBundleName</key>
+            <string>ExploitTool</string>
+            <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>CFBundleExecutable</key>
+            <string>ExploitTool</string>
+          </dict>
+          </plist>
+          EOF
+          
+          # 复制源文件
+          mkdir -p Payload/ExploitTool.app/src
+          cp -f *.swift Payload/ExploitTool.app/src/ 2>/dev/null || :
+          cp -f *.h Payload/ExploitTool.app/src/ 2>/dev/null || :
+          cp -f *.m Payload/ExploitTool.app/src/ 2>/dev/null || :
+          
+          # 打包IPA
+          zip -r build/ExploitTool.ipa Payload
+          rm -rf Payload
+          
+          echo "IPA文件创建完成:"
+          ls -la build/
+      
+      # 上传到GitHub Release而不是使用upload-artifact
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          draft: false
+          prerelease: false
+          files: build/ExploitTool.ipa

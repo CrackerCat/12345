@@ -1,0 +1,96 @@
+name: iOS Package Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+# 添加权限配置
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    name: Build iOS Package
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: List workspace files
+        run: |
+          echo "工作目录内容:"
+          ls -la
+          echo "--------------------"
+      
+      - name: Create IPA package
+        run: |
+          # 创建build目录
+          mkdir -p build
+          
+          # 创建示例IPA文件
+          mkdir -p Payload/ExploitTool.app
+          
+          # 创建Info.plist
+          cat > Payload/ExploitTool.app/Info.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleIdentifier</key>
+            <string>com.example.ExploitTool</string>
+            <key>CFBundleName</key>
+            <string>ExploitTool</string>
+            <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>CFBundleExecutable</key>
+            <string>ExploitTool</string>
+          </dict>
+          </plist>
+          EOF
+          
+          # 复制源文件
+          mkdir -p Payload/ExploitTool.app/src
+          cp -f *.swift Payload/ExploitTool.app/src/ 2>/dev/null || :
+          cp -f *.h Payload/ExploitTool.app/src/ 2>/dev/null || :
+          cp -f *.m Payload/ExploitTool.app/src/ 2>/dev/null || :
+          
+          # 打包IPA
+          zip -r build/ExploitTool.ipa Payload
+          rm -rf Payload
+          
+          echo "IPA文件创建完成:"
+          ls -la build/
+          
+      # 使用GitHub CLI直接创建release
+      - name: Create GitHub Release
+        run: |
+          # 创建标签
+          BUILD_TAG="build-${{ github.run_number }}"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git tag -a $BUILD_TAG -m "Build ${{ github.run_number }}"
+          git push origin $BUILD_TAG
+          
+          # 使用curl上传文件
+          GITHUB_API_URL="https://api.github.com/repos/${{ github.repository }}/releases"
+          RELEASE_DATA="{\"tag_name\":\"$BUILD_TAG\",\"name\":\"Build ${{ github.run_number }}\",\"draft\":false,\"prerelease\":false}"
+          
+          # 创建release
+          RESPONSE=$(curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                          -H "Accept: application/vnd.github.v3+json" \
+                          -d "$RELEASE_DATA" \
+                          $GITHUB_API_URL)
+          
+          # 获取上传URL
+          UPLOAD_URL=$(echo $RESPONSE | jq -r .upload_url | sed 's/{?name,label}//')
+          
+          # 上传IPA文件
+          curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Content-Type: application/octet-stream" \
+               --data-binary @build/ExploitTool.ipa \
+               "${UPLOAD_URL}?name=ExploitTool.ipa"

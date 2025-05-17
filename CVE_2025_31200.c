@@ -141,7 +141,7 @@ bool set_special_vm_flags(void* addr) {
 }
 
 // 验证文件内容是否被修改
-static bool verify_changes(const char* path, const unsigned char* original_content, size_t content_size) {
+bool verify_changes(const char* path, const unsigned char* original_content, size_t content_size) {
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
         printf("[-] 验证时无法打开文件\n");

